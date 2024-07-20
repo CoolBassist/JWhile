@@ -51,33 +51,25 @@ class Void extends Statement {
   }
 }
 
-class IfStatement extends Statement {
+class IfElseStatement extends Statement {
   Expression condition = Null();
-  Statement body = Void();
+  List<Statement> body = [Void()];
+  List<Statement> elseBranch = [Void()];
 
-  IfStatement(this.condition, this.body);
-
-  @override
-  Map<String, int> run(Map<String, int> env) {
-    if (condition.eval(env) != 0) {
-      body.run(env);
-    }
-
-    return env;
-  }
-}
-
-class IfElseStatement extends IfStatement {
-  Expression elseBranch = Null();
-
-  IfElseStatement(super.condition, super.body, this.elseBranch);
+  IfElseStatement(this.condition, this.body, this.elseBranch);
 
   @override
   Map<String, int> run(Map<String, int> env) {
-    if (condition.eval(env) != 0) {
-      body.run(env);
+    var tEnv = Map<String, int>.from(env);
+
+    if (condition.eval(tEnv) != 0) {
+      for (var stmt in body) {
+        tEnv = stmt.run(tEnv);
+      }
     } else {
-      elseBranch.eval(env);
+      for (var stmt in elseBranch) {
+        stmt.run(env);
+      }
     }
 
     return env;
@@ -161,6 +153,8 @@ class ForStatement extends Statement {
   Expression cond = Null();
   Statement assignment = Void();
   List<Statement> body = [Void()];
+
+  ForStatement(this.initial, this.cond, this.assignment, this.body);
 
   @override
   Map<String, int> run(Map<String, int> env) {
@@ -399,11 +393,13 @@ class Parser {
             if (_expect(TokenType.rParenTok)) {
               position++;
               if (_expect(TokenType.lBraceTok)) {
+                position++;
                 var body = _parseStatements();
                 if (_expect(TokenType.rBraceTok)) {
                   statements.add(WhileStatement(cond, body));
                 } else {
-                  throw Exception("Expected right brace for while loop.");
+                  throw Exception(
+                      "Expected right brace for while loop. but got ${_getNextToken().type}");
                 }
               } else {
                 throw Exception("Expected left brace for while loop.");
@@ -414,6 +410,43 @@ class Parser {
           } else {
             throw Exception("Expected left paren for while statement.");
           }
+        case TokenType.forTok:
+          position++;
+          if (_expect(TokenType.lParenTok)) {
+            if (_expect(TokenType.semiColonTok)) {
+              position++;
+              var initial = _parseAssignment();
+              position++;
+              var cond = _parseBooleanExpression();
+              if (_expect(TokenType.semiColonTok)) {
+                var assignment = _parseAssignment();
+                if (_expect(TokenType.rParenTok)) {
+                  position++;
+                  if (_expect(TokenType.lBraceTok)) {
+                    var body = _parseStatements();
+                    if (_expect(TokenType.rBraceTok)) {
+                      ForStatement(initial, cond, assignment, body);
+                    } else {
+                      throw Exception("Expected } for for loop.");
+                    }
+                  } else {
+                    throw Exception("Expected { for for loop");
+                  }
+                } else {
+                  throw Exception("Expected ) for for loop.");
+                }
+              } else {
+                throw Exception("Expected second ; for for loop");
+              }
+            } else {
+              throw Exception("Expected first ; for for loop");
+            }
+          } else {
+            throw Exception("Expected ( for  for loop");
+          }
+        case TokenType.ifTok:
+          var ifExpression = _parseIfStatement();
+          statements.add(ifExpression);
         case TokenType.eof:
           Logger.debug("Reached EOF");
         case _:
@@ -463,8 +496,80 @@ class Parser {
     }
   }
 
+  IfElseStatement _parseIfStatement() {
+    if (_expect(TokenType.ifTok)) {
+      position++;
+      if (_expect(TokenType.lParenTok)) {
+        var cond = _parseBooleanExpression();
+        if (_expect(TokenType.rParenTok)) {
+          position++;
+          if (_expect(TokenType.lBraceTok)) {
+            position++;
+            var body = _parseStatements();
+            if (_expect(TokenType.rBraceTok)) {
+              position++;
+              if (_expect(TokenType.elseTok)) {
+                position++;
+                if (_expect(TokenType.lBraceTok)) {
+                  var elseBranch = _parseStatements();
+                  if (_expect(TokenType.rBraceTok)) {
+                    return IfElseStatement(cond, body, elseBranch);
+                  } else {
+                    throw Exception("Expected } on else statement.");
+                  }
+                } else {
+                  throw Exception("Expected { on else statement.");
+                }
+              } else {
+                return IfElseStatement(cond, body, [Void()]);
+              }
+            } else {
+              throw Exception("Expected } on if statement.");
+            }
+          } else {
+            throw Exception("Expected { on else statement.");
+          }
+        } else {
+          throw Exception("Expected ) on else statement.");
+        }
+      } else {
+        throw Exception("Expected ( on else statement.");
+      }
+    } else {
+      throw Exception("How?");
+    }
+  }
+
   List<Statement> _parseStatements() {
-    return [];
+    int numberOfBrackets = 0;
+
+    List<Token> tokens = [];
+
+    while (_getNextToken().type != TokenType.eof && numberOfBrackets >= 0) {
+      if (_getNextToken().type == TokenType.lBraceTok) {
+        numberOfBrackets++;
+      }
+
+      if (_getNextToken().type == TokenType.rBraceTok) {
+        if (numberOfBrackets == 0) {
+          break;
+        }
+
+        numberOfBrackets--;
+      }
+
+      tokens.add(_getNextToken());
+
+      position++;
+    }
+
+    if (_getNextToken().type == TokenType.eof && numberOfBrackets >= 0) {
+      throw Exception("Missing right brace on while loop.");
+    }
+
+    var subParser = Parser(tokens);
+
+    return subParser.generateProgram();
   }
 
   AssignmentStatement _parseAssignment() {
@@ -545,6 +650,6 @@ class Parser {
 
     Lexer.prettyPrint(tokens);
 
-    throw Exception("Syntax error parsing expression. tokens:");
+    throw Exception("Syntax error parsing expression");
   }
 }

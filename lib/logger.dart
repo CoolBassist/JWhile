@@ -56,4 +56,8 @@ class Logger {
   static void setError() {
     _logLevel = Level.error;
   }
+
+  static void setNone() {
+    _logLevel = Level.none;
+  }
 }

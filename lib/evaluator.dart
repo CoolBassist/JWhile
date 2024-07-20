@@ -7,11 +7,11 @@ class Evaluator {
 
   Evaluator(this.program);
 
-  Map<String, int> env = {};
-
-  void execute() {
+  Map<String, int> execute(Map<String, int> env) {
     for (var stmt in program) {
       env = stmt.run(env);
     }
+
+    return env;
   }
 }

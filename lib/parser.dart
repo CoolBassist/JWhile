@@ -1,5 +1,6 @@
 import 'package:jwhile/lexer.dart';
 import 'package:jwhile/logger.dart';
+import 'package:jwhile/parse_util.dart' as utils;
 
 abstract class Statement {
   Map<String, int> run(Map<String, int> env);
@@ -186,8 +187,9 @@ class PrintStatement extends Statement {
 
   @override
   Map<String, int> run(Map<String, int> env) {
+    Logger.debug("Inside print statement.");
     print(e.eval(env));
-
+    Logger.debug("Finished printing");
     return env;
   }
 }
@@ -249,6 +251,8 @@ class PlusExpression extends Expression {
 class SubExpression extends Expression {
   Expression lhs = Null();
   Expression rhs = Null();
+
+  SubExpression(this.lhs, this.rhs);
 
   @override
   int eval(Map<String, int> env) {
@@ -358,23 +362,69 @@ class Parser {
     List<Statement> statements = [];
 
     while (currentToken.type != TokenType.eof) {
+      currentToken = _getNextToken();
+
       switch (currentToken.type) {
         case TokenType.identifierTok:
+          var ass = _parseAssignment();
+          if (_expect(TokenType.semiColonTok)) {
+            statements.add(ass);
+          } else {
+            throw Exception("Expected semicolon for assignment.");
+          }
+        case TokenType.printTok:
           position++;
-          if (_expect(TokenType.assignTok)) {
+          if (_expect(TokenType.lParenTok)) {
             position++;
-            var (result, expression) = _parseExpression();
-            if (result && _expect(TokenType.semiColonTok)) {
-              statements
-                  .add(AssignmentStatement(currentToken.literal, expression));
+            var expression = _parseExpression();
+            if (_expect(TokenType.rParenTok)) {
+              position++;
+              if (_expect(TokenType.semiColonTok)) {
+                statements.add(PrintStatement(expression));
+              } else {
+                throw Exception("Expected semicolon for print statement");
+              }
+            } else {
+              throw Exception(
+                  "Expected right paren for print statement but got ${_getNextToken().type}");
             }
           } else {
-            throw Exception("Expected assignment.");
+            throw Exception("Expected lparen for print statement");
           }
+        case TokenType.whileTok:
+          position++;
+          if (_expect(TokenType.lParenTok)) {
+            position++;
+            var cond = _parseBooleanExpression();
+            if (_expect(TokenType.rParenTok)) {
+              position++;
+              if (_expect(TokenType.lBraceTok)) {
+                var body = _parseStatements();
+                if (_expect(TokenType.rBraceTok)) {
+                  statements.add(WhileStatement(cond, body));
+                } else {
+                  throw Exception("Expected right brace for while loop.");
+                }
+              } else {
+                throw Exception("Expected left brace for while loop.");
+              }
+            } else {
+              throw Exception("Expected right paren for while loop.");
+            }
+          } else {
+            throw Exception("Expected left paren for while statement.");
+          }
+        case TokenType.eof:
+          Logger.debug("Reached EOF");
         case _:
-          throw Exception("Syntax error.");
+          throw Exception(
+              "Syntax error ${currentToken.literal} is not meant to be there!");
       }
+
+      position++;
     }
+
+    return statements;
   }
 
   Token _getNextToken() {
@@ -389,17 +439,112 @@ class Parser {
     return _getNextToken().type == type;
   }
 
-  (bool, Expression) _parseExpression() {
+  Expression _parseBooleanExpression() {
+    var lhs = _parseExpression();
+    var operator = _getNextToken();
+    position++;
+    var rhs = _parseExpression();
+
+    switch (operator.type) {
+      case TokenType.lessThanTok:
+        return LessThanExpression(lhs, rhs);
+      case TokenType.lessOrEqualTok:
+        return LessOrEqualThanExpression(lhs, rhs);
+      case TokenType.equalityTok:
+        return EqualityExpression(lhs, rhs);
+      case TokenType.greaterOrEqualTok:
+        return GreaterOrEqualThanExpression(lhs, rhs);
+      case TokenType.greaterThanTok:
+        return GreaterThanExpression(lhs, rhs);
+      case TokenType.notEqualTok:
+        return InequalityExpression(lhs, rhs);
+      case _:
+        throw Exception("Unknown boolean operator: ${operator.type}");
+    }
+  }
+
+  List<Statement> _parseStatements() {
+    return [];
+  }
+
+  AssignmentStatement _parseAssignment() {
+    var ident = _getNextToken();
+    position++;
+    if (_expect(TokenType.assignTok)) {
+      position++;
+      var exp = _parseExpression();
+      return AssignmentStatement(ident.literal, exp);
+    }
+
+    throw Exception("Expected assignment operator.");
+  }
+
+  Expression _parseExpression() {
     // iterate through and create a list of all sensible tokens.
 
     List<Token> goodTokens = [];
+    List<TokenType> goodTypes = [
+      TokenType.numberTok,
+      TokenType.identifierTok,
+      TokenType.plusTok,
+      TokenType.subtractTok,
+      TokenType.multiplyTok,
+      TokenType.divideTok,
+      TokenType.modulusTok,
+    ];
 
-    // attempt to find + and -
+    while (goodTypes.contains(_getNextToken().type)) {
+      goodTokens.add(_getNextToken());
+      position++;
+    }
 
-    // attempt to find * / and %
+    return _parseExpressionWrap(goodTokens);
+  }
 
-    // finalist numbers, variables, input, arrays and brackets.
+  Expression _parseExpressionWrap(List<Token> tokens) {
+    var (hasPlus, lhsPlus, rhsPlus) =
+        utils.parseSplit(tokens, TokenType.plusTok);
+    if (hasPlus) {
+      return PlusExpression(
+          _parseExpressionWrap(lhsPlus), _parseExpressionWrap(rhsPlus));
+    }
 
-    return (false, Number(2));
+    var (hasSub, lhsSub, rhsSub) =
+        utils.parseSplit(tokens, TokenType.subtractTok);
+    if (hasSub) {
+      return SubExpression(
+          _parseExpressionWrap(lhsSub), _parseExpressionWrap(rhsSub));
+    }
+
+    var (hasMult, lhsMult, rhsMult) =
+        utils.parseSplit(tokens, TokenType.multiplyTok);
+    if (hasMult) {
+      return SubExpression(
+          _parseExpressionWrap(lhsMult), _parseExpressionWrap(rhsMult));
+    }
+
+    var (hasDiv, lhsDiv, rhsDiv) =
+        utils.parseSplit(tokens, TokenType.divideTok);
+    if (hasDiv) {
+      return SubExpression(
+          _parseExpressionWrap(lhsDiv), _parseExpressionWrap(rhsDiv));
+    }
+
+    if (tokens.length == 1) {
+      switch (tokens[0].type) {
+        case TokenType.numberTok:
+          return Number(int.parse(tokens[0].literal));
+        case TokenType.identifierTok:
+          return Variable(tokens[0].literal);
+        case _:
+          throw Exception("Syntax Error parsing expression. tokens: $tokens");
+      }
+    }
+
+    print("Error!!");
+
+    Lexer.prettyPrint(tokens);
+
+    throw Exception("Syntax error parsing expression. tokens:");
   }
 }

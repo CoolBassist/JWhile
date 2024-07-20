@@ -204,4 +204,10 @@ class Lexer {
         return Token(TokenType.identifierTok, t);
     }
   }
+
+  static void prettyPrint(List<Token> tokens) {
+    for (var tok in tokens) {
+      print("(Type: ${tok.type}, Literal: `${tok.literal}`)");
+    }
+  }
 }

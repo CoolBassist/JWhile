@@ -288,6 +288,8 @@ class DivideExpression extends Expression {
   Expression lhs = Null();
   Expression rhs = Null();
 
+  DivideExpression(this.lhs, this.rhs);
+
   @override
   int eval(Map<String, int> env) {
     return lhs.eval(env) ~/ rhs.eval(env);
@@ -686,8 +688,15 @@ class Parser {
     var (hasDiv, lhsDiv, rhsDiv) =
         utils.parseSplit(tokens, TokenType.divideTok);
     if (hasDiv) {
-      return SubExpression(
+      return DivideExpression(
           _parseExpressionWrap(lhsDiv), _parseExpressionWrap(rhsDiv));
+    }
+
+    var (hasMod, lhsMod, rhsMod) =
+        utils.parseSplit(tokens, TokenType.divideTok);
+    if (hasMod) {
+      return SubExpression(
+          _parseExpressionWrap(lhsMod), _parseExpressionWrap(rhsMod));
     }
 
     if (tokens.length == 1) {

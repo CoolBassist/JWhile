@@ -1,3 +1,5 @@
+import 'package:jwhile/logger.dart';
+
 enum TokenType {
   numberTok,
   identifierTok,
@@ -93,7 +95,16 @@ class Lexer {
         case "*":
           tokens.add(Token(TokenType.multiplyTok, "*"));
         case "/":
-          tokens.add(Token(TokenType.divideTok, "/"));
+          if (_getCharAfterNext() == "/") {
+            while (
+                _getCharAfterNext() != "\n" && _getCharAfterNext().isNotEmpty) {
+              position++;
+            }
+            position++;
+            continue;
+          } else {
+            tokens.add(Token(TokenType.divideTok, "/"));
+          }
         case "%":
           tokens.add(Token(TokenType.modulusTok, "%"));
         case "0" || "1" || "2" || "3" || "4" || "5" || "6" || "7" || "8" || "9":
@@ -174,8 +185,8 @@ class Lexer {
     return value != null;
   }
 
-  bool _isValidIdentifierCharacter(s) {
-    return "_abcdefghijklmnopqrstuwxyz0123456789".contains(s);
+  bool _isValidIdentifierCharacter(String s) {
+    return s.isNotEmpty && "_abcdefghijklmnopqrstuwxyz0123456789".contains(s);
   }
 
   Token _parseIdentifier() {

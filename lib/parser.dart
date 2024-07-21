@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:jwhile/lexer.dart';
 import 'package:jwhile/logger.dart';
 import 'package:jwhile/parse_util.dart' as utils;
@@ -180,6 +182,7 @@ class ForStatement extends Statement {
   Map<String, int> run(Map<String, int> env) {
     var tempEnv = Map<String, int>.from(env);
     tempEnv = initial.run(tempEnv);
+
     while (cond.eval(tempEnv) != 0) {
       for (var stmt in body) {
         tempEnv = stmt.run(tempEnv);
@@ -456,19 +459,22 @@ class Parser {
         case TokenType.forTok:
           position++;
           if (_expect(TokenType.lParenTok)) {
+            position++;
+            var initial = _parseAssignment();
             if (_expect(TokenType.semiColonTok)) {
-              position++;
-              var initial = _parseAssignment();
               position++;
               var cond = _parseBooleanExpression();
               if (_expect(TokenType.semiColonTok)) {
+                position++;
                 var assignment = _parseAssignment();
                 if (_expect(TokenType.rParenTok)) {
                   position++;
                   if (_expect(TokenType.lBraceTok)) {
+                    position++;
                     var body = _parseStatements();
                     if (_expect(TokenType.rBraceTok)) {
-                      ForStatement(initial, cond, assignment, body);
+                      statements
+                          .add(ForStatement(initial, cond, assignment, body));
                     } else {
                       throw Exception(
                           "Expected } for for loop, but got ${_getNextToken().type}.");
@@ -561,6 +567,7 @@ class Parser {
               if (_expect(TokenType.elseTok)) {
                 position++;
                 if (_expect(TokenType.lBraceTok)) {
+                  position++;
                   var elseBranch = _parseStatements();
                   if (_expect(TokenType.rBraceTok)) {
                     return IfElseStatement(cond, body, elseBranch);
@@ -620,7 +627,7 @@ class Parser {
     }
 
     if (_getNextToken().type == TokenType.eof && numberOfBrackets >= 0) {
-      throw Exception("Expected } on while loop.");
+      throw Exception("Expected } on ending block $numberOfBrackets.");
     }
 
     var subParser = Parser(tokens);
@@ -629,6 +636,10 @@ class Parser {
   }
 
   AssignmentStatement _parseAssignment() {
+    if (!_expect(TokenType.identifierTok)) {
+      throw Exception(
+          "Expected identifier for assignment, but got ${_getNextToken().type}.");
+    }
     var ident = _getNextToken();
     position++;
     if (_expect(TokenType.assignTok)) {

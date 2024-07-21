@@ -281,6 +281,8 @@ class MultExpression extends Expression {
   Expression lhs = Null();
   Expression rhs = Null();
 
+  MultExpression(this.lhs, this.rhs);
+
   @override
   int eval(Map<String, int> env) {
     return lhs.eval(env) * rhs.eval(env);
@@ -302,6 +304,8 @@ class DivideExpression extends Expression {
 class ModExpression extends Expression {
   Expression lhs = Null();
   Expression rhs = Null();
+
+  ModExpression(this.lhs, this.rhs);
 
   @override
   int eval(Map<String, int> env) {
@@ -692,7 +696,7 @@ class Parser {
     var (hasMult, lhsMult, rhsMult) =
         utils.parseSplit(tokens, TokenType.multiplyTok);
     if (hasMult) {
-      return SubExpression(
+      return MultExpression(
           _parseExpressionWrap(lhsMult), _parseExpressionWrap(rhsMult));
     }
 
@@ -704,9 +708,9 @@ class Parser {
     }
 
     var (hasMod, lhsMod, rhsMod) =
-        utils.parseSplit(tokens, TokenType.divideTok);
+        utils.parseSplit(tokens, TokenType.modulusTok);
     if (hasMod) {
-      return SubExpression(
+      return ModExpression(
           _parseExpressionWrap(lhsMod), _parseExpressionWrap(rhsMod));
     }
 

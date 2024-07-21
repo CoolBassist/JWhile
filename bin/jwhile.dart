@@ -5,6 +5,26 @@ import 'package:jwhile/parser.dart';
 import 'dart:io';
 
 void main(List<String> arguments) {
+  if (arguments.isNotEmpty) {
+    var program = File(arguments[0]);
+
+    program.exists().then((res) {
+      if (!res) {
+        print("\"${arguments[0]}\" does not exist!");
+        exit(0);
+      }
+    });
+
+    program.readAsString().then((input) {
+      var lexer = Lexer(input);
+      var parser = Parser(lexer.getTokens());
+      var eval = Evaluator(parser.generateProgram());
+      eval.execute({});
+    });
+
+    return;
+  }
+
   print("JWhile Interpreter V1.0");
 
   String? input = "";
@@ -27,31 +47,4 @@ void main(List<String> arguments) {
 
     env = eval.execute(env);
   }
-
-  //var input = "a = 0; while(a <= 10){ print(a); a = a + 1;   } ";
-
-  /*Logger.setWarning();
-
-  print("Input: $input");
-
-  var lexer = Lexer(input);
-
-  var tokens = lexer.getTokens();
-
-  print("Tokens:");
-  Lexer.prettyPrint(tokens);
-
-  var parser = Parser(tokens);
-
-  var parsed = parser.generateProgram();
-
-  print("Parsed Program: $parsed");
-
-  var eval = Evaluator(parsed);
-
-  print("Executing:");
-
-  eval.execute();
-
-  Logger.setNone();*/
 }

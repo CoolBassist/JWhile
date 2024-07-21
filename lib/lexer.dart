@@ -81,8 +81,11 @@ class Lexer {
           } else {
             tokens.add(Token(TokenType.greaterThanTok, ">"));
           }
-        case "!=":
-          tokens.add(Token(TokenType.notEqualTok, "!="));
+        case "!":
+          if (_getCharAfterNext() == "=") {
+            tokens.add(Token(TokenType.notEqualTok, "!="));
+            position++;
+          }
         case "+":
           tokens.add(Token(TokenType.plusTok, "+"));
         case "-":

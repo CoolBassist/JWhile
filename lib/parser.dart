@@ -13,7 +13,14 @@ abstract class Expression {
 class Null extends Expression {
   @override
   int eval(Map<String, int> env) {
-    return -1;
+    throw Exception("Attempting to evaluate null");
+  }
+}
+
+class Void extends Statement {
+  @override
+  Map<String, int> run(Map<String, int> env) {
+    throw Exception("Attempting to run a Void statement.");
   }
 }
 
@@ -44,28 +51,41 @@ class Variable extends Expression {
   }
 }
 
-class Void extends Statement {
-  @override
-  Map<String, int> run(Map<String, int> env) {
-    return env;
-  }
-}
-
-class IfElseStatement extends Statement {
+class IfStatement extends Statement {
   Expression condition = Null();
   List<Statement> body = [Void()];
-  List<Statement> elseBranch = [Void()];
 
-  IfElseStatement(this.condition, this.body, this.elseBranch);
+  IfStatement(this.condition, this.body);
 
-  @override
-  Map<String, int> run(Map<String, int> env) {
+  Map<String, int> _runBody(Map<String, int> env) {
     var tEnv = Map<String, int>.from(env);
 
     if (condition.eval(tEnv) != 0) {
       for (var stmt in body) {
         tEnv = stmt.run(tEnv);
       }
+    }
+
+    return env;
+  }
+
+  @override
+  Map<String, int> run(Map<String, int> env) {
+    return _runBody(env);
+  }
+}
+
+class IfElseStatement extends IfStatement {
+  List<Statement> elseBranch = [Void()];
+
+  IfElseStatement(super.condition, super.body, this.elseBranch);
+
+  @override
+  Map<String, int> run(Map<String, int> env) {
+    var tEnv = Map<String, int>.from(env);
+
+    if (condition.eval(tEnv) != 0) {
+      tEnv = _runBody(env);
     } else {
       for (var stmt in elseBranch) {
         stmt.run(env);
@@ -168,7 +188,7 @@ class ForStatement extends Statement {
       tempEnv = assignment.run(tempEnv);
     }
 
-    // TODO: copy old values
+    //TODO: Copy old values.
 
     return env;
   }
@@ -364,26 +384,44 @@ class Parser {
           if (_expect(TokenType.semiColonTok)) {
             statements.add(ass);
           } else {
-            throw Exception("Expected semicolon for assignment.");
+            throw Exception(
+                "Expected semicolon for assignment, but got ${_getNextToken().type}.");
           }
         case TokenType.printTok:
           position++;
           if (_expect(TokenType.lParenTok)) {
             position++;
-            var expression = _parseExpression();
+            bool isQuote = false;
+            String literal = "";
+
+            Expression e = Null();
+
+            if (_expect(TokenType.quoteTok)) {
+              isQuote = true;
+              literal = _getNextToken().literal;
+              position++;
+            } else {
+              e = _parseExpression();
+            }
             if (_expect(TokenType.rParenTok)) {
               position++;
               if (_expect(TokenType.semiColonTok)) {
-                statements.add(PrintStatement(expression));
+                if (isQuote) {
+                  statements.add(PrintQuoteStatement(Quote(literal)));
+                } else {
+                  statements.add(PrintStatement(e));
+                }
               } else {
-                throw Exception("Expected semicolon for print statement");
+                throw Exception(
+                    "Expected ; for print statement, but got ${_getNextToken().type}.");
               }
             } else {
               throw Exception(
-                  "Expected right paren for print statement but got ${_getNextToken().type}");
+                  "Expected ) for print statement but got ${_getNextToken().type}");
             }
           } else {
-            throw Exception("Expected lparen for print statement");
+            throw Exception(
+                "Expected ( for print statement, but got ${_getNextToken().type}.");
           }
         case TokenType.whileTok:
           position++;
@@ -399,16 +437,19 @@ class Parser {
                   statements.add(WhileStatement(cond, body));
                 } else {
                   throw Exception(
-                      "Expected right brace for while loop. but got ${_getNextToken().type}");
+                      "Expected } for while loop, but got ${_getNextToken().type}.");
                 }
               } else {
-                throw Exception("Expected left brace for while loop.");
+                throw Exception(
+                    "Expected { for while loop, but got ${_getNextToken().type}.");
               }
             } else {
-              throw Exception("Expected right paren for while loop.");
+              throw Exception(
+                  "Expected ( for while loop, but got ${_getNextToken().type}.");
             }
           } else {
-            throw Exception("Expected left paren for while statement.");
+            throw Exception(
+                "Expected ) for while statement, but got ${_getNextToken().type}.");
           }
         case TokenType.forTok:
           position++;
@@ -427,22 +468,28 @@ class Parser {
                     if (_expect(TokenType.rBraceTok)) {
                       ForStatement(initial, cond, assignment, body);
                     } else {
-                      throw Exception("Expected } for for loop.");
+                      throw Exception(
+                          "Expected } for for loop, but got ${_getNextToken().type}.");
                     }
                   } else {
-                    throw Exception("Expected { for for loop");
+                    throw Exception(
+                        "Expected { for for loop, but got ${_getNextToken().type}.");
                   }
                 } else {
-                  throw Exception("Expected ) for for loop.");
+                  throw Exception(
+                      "Expected ) for for loop, but got ${_getNextToken().type}.");
                 }
               } else {
-                throw Exception("Expected second ; for for loop");
+                throw Exception(
+                    "Expected second ; for for loop, but got ${_getNextToken().type}.");
               }
             } else {
-              throw Exception("Expected first ; for for loop");
+              throw Exception(
+                  "Expected first ; for for loop, but got ${_getNextToken().type}.");
             }
           } else {
-            throw Exception("Expected ( for  for loop");
+            throw Exception(
+                "Expected ( for for loop, but got ${_getNextToken().type}.");
           }
         case TokenType.ifTok:
           var ifExpression = _parseIfStatement();
@@ -496,10 +543,11 @@ class Parser {
     }
   }
 
-  IfElseStatement _parseIfStatement() {
+  Statement _parseIfStatement() {
     if (_expect(TokenType.ifTok)) {
       position++;
       if (_expect(TokenType.lParenTok)) {
+        position++;
         var cond = _parseBooleanExpression();
         if (_expect(TokenType.rParenTok)) {
           position++;
@@ -515,25 +563,31 @@ class Parser {
                   if (_expect(TokenType.rBraceTok)) {
                     return IfElseStatement(cond, body, elseBranch);
                   } else {
-                    throw Exception("Expected } on else statement.");
+                    throw Exception(
+                        "Expected } on else statement, but got ${_getNextToken().type}.");
                   }
                 } else {
-                  throw Exception("Expected { on else statement.");
+                  throw Exception(
+                      "Expected { on else statement, but got ${_getNextToken().type}.");
                 }
               } else {
-                return IfElseStatement(cond, body, [Void()]);
+                return IfStatement(cond, body);
               }
             } else {
-              throw Exception("Expected } on if statement.");
+              throw Exception(
+                  "Expected } on if statement, but got ${_getNextToken().type}.");
             }
           } else {
-            throw Exception("Expected { on else statement.");
+            throw Exception(
+                "Expected { on else statement, but got ${_getNextToken().type}.");
           }
         } else {
-          throw Exception("Expected ) on else statement.");
+          throw Exception(
+              "Expected ) on else statement, but got ${_getNextToken().type}.");
         }
       } else {
-        throw Exception("Expected ( on else statement.");
+        throw Exception(
+            "Expected ( on else statement, but got ${_getNextToken().type}.");
       }
     } else {
       throw Exception("How?");
@@ -564,7 +618,7 @@ class Parser {
     }
 
     if (_getNextToken().type == TokenType.eof && numberOfBrackets >= 0) {
-      throw Exception("Missing right brace on while loop.");
+      throw Exception("Expected } on while loop.");
     }
 
     var subParser = Parser(tokens);
@@ -581,7 +635,8 @@ class Parser {
       return AssignmentStatement(ident.literal, exp);
     }
 
-    throw Exception("Expected assignment operator.");
+    throw Exception(
+        "Expected = on assignment, but got ${_getNextToken().type}.");
   }
 
   Expression _parseExpression() {

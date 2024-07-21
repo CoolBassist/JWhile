@@ -4,6 +4,12 @@ import 'package:jwhile/logger.dart';
 import 'package:jwhile/parser.dart';
 import 'dart:io';
 
+/* 
+
+An interpreter for the JWhile language, written in Dart.
+
+*/
+
 void main(List<String> arguments) {
   if (arguments.isNotEmpty) {
     var program = File(arguments[0]);

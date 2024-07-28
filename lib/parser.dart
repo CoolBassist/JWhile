@@ -454,11 +454,11 @@ class Parser {
               }
             } else {
               throw Exception(
-                  "Expected ( for while loop, but got ${_getNextToken().type}.");
+                  "Expected ) for while loop, but got ${_getNextToken().type}.");
             }
           } else {
             throw Exception(
-                "Expected ) for while statement, but got ${_getNextToken().type}.");
+                "Expected ( for while statement, but got ${_getNextToken().type}.");
           }
         case TokenType.forTok:
           position++;

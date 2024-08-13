@@ -3,6 +3,17 @@
 
 JWhile was a language I designed during my final year project of my bachelors. I wrote a compiler that targeted a CPU that I also designed, since then I've been wanting to write an interpreter for it so I can run the language locally, however I couldn't find a language which seemed natural to write it in. Then I discovered Dart.
 
+## TODO
+Listed in order of priority
+- [ ] Add JWhile error messages instead of relying on Darts
+- [ ] Add ability to compile to 6502 assembly
+- [ ] Add ability to compile to Z80 assembly
+- [ ] Add arrays back into the language
+- [ ] Add functions into the language
+- [ ] Add structures into the language
+- [ ] Add classes into the language
+
+
 ## Quick Start
 To start, simply compile with `jwhile.dart` as the entry point (`dart compile exe bin/jwhile.dart -o jwhile.exe`), or run `dart run`.
 
